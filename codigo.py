@@ -4,7 +4,7 @@ from datetime import datetime
 
 # --- Configuração da Página ---
 st.set_page_config(
-    page_title="Relatório de Jogo",
+    page_title="Relatório de Jogo Pro",
     page_icon="⚽",
     layout="wide"
 )
@@ -28,6 +28,7 @@ def registrar_evento(tipo_evento, equipa):
     minuto = 0
     if st.session_state['inicio_jogo']:
         delta = agora - st.session_state['inicio_jogo']
+        # Converte segundos em minutos
         minuto = int(delta.total_seconds() // 60) + 1
     
     novo_evento = {
@@ -36,24 +37,21 @@ def registrar_evento(tipo_evento, equipa):
         "Evento": tipo_evento
     }
     st.session_state['eventos'].append(novo_evento)
-    st.toast(f"✅ {tipo_evento} registado aos {minuto}' min!")
+    
+    # Se for golo, celebramos!
+    if tipo_evento == "Golo":
+        st.toast(f"⚽ GOLO!! ({equipa})", icon="🎉")
+    else:
+        st.toast(f"✅ {tipo_evento} registado aos {minuto}' min!")
 
-# --- FUNÇÃO ESPECIAL DO RELÓGIO (A MÁGICA ESTÁ AQUI) ---
-# O 'run_every=1' faz esta função atualizar sozinha a cada 1 segundo
+# --- FUNÇÃO DO CRONÓMETRO (Atualiza a cada 1s) ---
 @st.fragment(run_every=1)
 def mostrar_cronometro():
     if st.session_state['inicio_jogo'] is not None:
         delta = datetime.now() - st.session_state['inicio_jogo']
-        # Formatar para MM:SS
         minutos = int(delta.total_seconds() // 60)
         segundos = int(delta.total_seconds() % 60)
-        
-        # Mostra o tempo formatado bonito (ex: 12:05)
-        st.metric(
-            label="Tempo de Jogo", 
-            value=f"{minutos:02d}:{segundos:02d}",
-            delta="A decorrer..."
-        )
+        st.metric(label="Tempo de Jogo", value=f"{minutos:02d}:{segundos:02d}")
     else:
         st.metric(label="Tempo de Jogo", value="00:00")
 
@@ -66,10 +64,7 @@ with st.sidebar:
     equipa_casa = st.text_input("Minha Equipa", "Minha Equipa")
     equipa_fora = st.text_input("Adversário", "Adversário")
     st.divider()
-    
-    # Chama a função do relógio automático aqui
     mostrar_cronometro()
-    
     if st.session_state['inicio_jogo'] is None:
         if st.button("⏱️ Iniciar Jogo", type="primary"):
             iniciar_jogo()
@@ -79,13 +74,34 @@ with st.sidebar:
             resetar_dados()
             st.rerun()
 
+# --- PLACAR / RESULTADO AO VIVO ---
+# Calculamos os golos filtrando a lista de eventos
+golos_casa = len([e for e in st.session_state['eventos'] if e['Evento'] == 'Golo' and e['Equipa'] == equipa_casa])
+golos_fora = len([e for e in st.session_state['eventos'] if e['Evento'] == 'Golo' and e['Equipa'] == equipa_fora])
+
+st.divider()
+col_placar1, col_placar2, col_placar3 = st.columns([1, 0.5, 1])
+
+# Estilo visual do placar com CSS inline para ficar grande
+with col_placar1:
+    st.markdown(f"<h3 style='text-align: center; color: #4CAF50;'>{equipa_casa}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; font-size: 60px;'>{golos_casa}</h1>", unsafe_allow_html=True)
+
+with col_placar2:
+    st.markdown("<br><h2 style='text-align: center; color: gray;'>VS</h2>", unsafe_allow_html=True)
+
+with col_placar3:
+    st.markdown(f"<h3 style='text-align: center; color: #FF5252;'>{equipa_fora}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; font-size: 60px;'>{golos_fora}</h1>", unsafe_allow_html=True)
+st.divider()
+
 # --- Área de Ação ---
-tab1, tab2, tab3 = st.tabs([f"🎮 {equipa_casa}", f"🛡️ {equipa_fora}", "📊 Dados"])
+tab1, tab2, tab3 = st.tabs([f"🎮 Ações {equipa_casa}", f"🛡️ Ações {equipa_fora}", "📊 Estatísticas"])
 
 with tab1:
-    st.subheader(f"Ações Ofensivas: {equipa_casa}")
     col1, col2, col3 = st.columns(3)
     with col1:
+        # Botão de GOLO com destaque
         st.button("⚽ GOLO", on_click=registrar_evento, args=("Golo", equipa_casa), type="primary", use_container_width=True)
         st.button("🎯 Remate à Baliza", on_click=registrar_evento, args=("Remate à Baliza", equipa_casa), use_container_width=True)
     with col2:
@@ -96,7 +112,6 @@ with tab1:
         st.button("🤕 Falta Sofrida", on_click=registrar_evento, args=("Falta Sofrida", equipa_casa), use_container_width=True)
 
 with tab2:
-    st.subheader(f"Registos do: {equipa_fora}")
     colA, colB = st.columns(2)
     with colA:
         st.button("Golo Sofrido", on_click=registrar_evento, args=("Golo", equipa_fora), type="primary", use_container_width=True)
@@ -108,14 +123,14 @@ with tab2:
 with tab3:
     if len(st.session_state['eventos']) > 0:
         df = pd.DataFrame(st.session_state['eventos'])
-        st.subheader("Resumo do Jogo")
+        st.subheader("Estatísticas")
         stats = df.pivot_table(index='Evento', columns='Equipa', aggfunc='size', fill_value=0)
         st.dataframe(stats, use_container_width=True)
         
-        st.subheader("Cronologia")
+        st.subheader("Timeline")
         st.dataframe(df[['Minuto', 'Equipa', 'Evento']].sort_values(by='Minuto', ascending=False), use_container_width=True, hide_index=True)
         
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Baixar CSV", data=csv, file_name='scout.csv', mime='text/csv')
     else:
-        st.info("O jogo ainda não começou.")
+        st.info("O jogo vai começar!")
