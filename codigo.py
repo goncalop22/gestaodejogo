@@ -58,7 +58,7 @@ def mostrar_cronometro():
         st.metric(label="Tempo de Jogo", value="00:00")
 
 # --- Interface Principal ---
-st.title("⚽ ScoutMaster: Painel de Jogo")
+st.title("⚽ Relatório de Jogo: Painel de Jogo")
 
 # Sidebar
 with st.sidebar:
