@@ -4,7 +4,7 @@ from datetime import datetime
 
 # --- Configuração da Página ---
 st.set_page_config(
-    page_title="ScoutMaster Pro",
+    page_title="Relatório de Jogo",
     page_icon="⚽",
     layout="wide"
 )
