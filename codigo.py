@@ -1,17 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import time
 
 # --- Configuração da Página ---
 st.set_page_config(
-    page_title="Relatório de jogo PRO",
+    page_title="ScoutMaster Pro",
     page_icon="⚽",
     layout="wide"
 )
 
-# --- Gestão de Estado (Session State) ---
-# Isto garante que os dados não se perdem quando clicas num botão
+# --- Gestão de Estado ---
 if 'eventos' not in st.session_state:
     st.session_state['eventos'] = []
 if 'inicio_jogo' not in st.session_state:
@@ -27,57 +25,65 @@ def resetar_dados():
 
 def registrar_evento(tipo_evento, equipa):
     agora = datetime.now()
-    
-    # Calcular minuto do jogo
     minuto = 0
     if st.session_state['inicio_jogo']:
         delta = agora - st.session_state['inicio_jogo']
         minuto = int(delta.total_seconds() // 60) + 1
     
-    # Adicionar ao registo
     novo_evento = {
         "Minuto": minuto,
         "Equipa": equipa,
-        "Evento": tipo_evento,
-        "Hora Real": agora.strftime("%H:%M:%S")
+        "Evento": tipo_evento
     }
     st.session_state['eventos'].append(novo_evento)
-    
-    # Feedback visual rápido
-    st.toast(f"✅ {tipo_evento} registado ({equipa})!")
+    st.toast(f"✅ {tipo_evento} registado aos {minuto}' min!")
+
+# --- FUNÇÃO ESPECIAL DO RELÓGIO (A MÁGICA ESTÁ AQUI) ---
+# O 'run_every=1' faz esta função atualizar sozinha a cada 1 segundo
+@st.fragment(run_every=1)
+def mostrar_cronometro():
+    if st.session_state['inicio_jogo'] is not None:
+        delta = datetime.now() - st.session_state['inicio_jogo']
+        # Formatar para MM:SS
+        minutos = int(delta.total_seconds() // 60)
+        segundos = int(delta.total_seconds() % 60)
+        
+        # Mostra o tempo formatado bonito (ex: 12:05)
+        st.metric(
+            label="Tempo de Jogo", 
+            value=f"{minutos:02d}:{segundos:02d}",
+            delta="A decorrer..."
+        )
+    else:
+        st.metric(label="Tempo de Jogo", value="00:00")
 
 # --- Interface Principal ---
-st.title("⚽ Relatório de jogo: Painel de Jogo")
+st.title("⚽ ScoutMaster: Painel de Jogo")
 
-# Sidebar para Configurações
+# Sidebar
 with st.sidebar:
     st.header("Configurações")
     equipa_casa = st.text_input("Minha Equipa", "Minha Equipa")
     equipa_fora = st.text_input("Adversário", "Adversário")
-    
     st.divider()
     
-    # Controlo do Cronómetro
+    # Chama a função do relógio automático aqui
+    mostrar_cronometro()
+    
     if st.session_state['inicio_jogo'] is None:
         if st.button("⏱️ Iniciar Jogo", type="primary"):
             iniciar_jogo()
             st.rerun()
     else:
-        tempo_decorrido = datetime.now() - st.session_state['inicio_jogo']
-        minutos_jogados = int(tempo_decorrido.total_seconds() // 60) + 1
-        st.metric(label="Tempo de Jogo", value=f"{minutos_jogados}' Min")
-        
         if st.button("⏹️ Terminar/Resetar"):
             resetar_dados()
             st.rerun()
 
-# --- Área de Ação (Botões Grandes) ---
-# Usamos Tabs para separar ações da Minha Equipa vs Adversário (para não enganar no clique)
+# --- Área de Ação ---
 tab1, tab2, tab3 = st.tabs([f"🎮 {equipa_casa}", f"🛡️ {equipa_fora}", "📊 Dados"])
 
 with tab1:
     st.subheader(f"Ações Ofensivas: {equipa_casa}")
-    
     col1, col2, col3 = st.columns(3)
     with col1:
         st.button("⚽ GOLO", on_click=registrar_evento, args=("Golo", equipa_casa), type="primary", use_container_width=True)
@@ -99,33 +105,17 @@ with tab2:
         st.button("Falta Deles", on_click=registrar_evento, args=("Falta Cometida", equipa_fora), use_container_width=True)
         st.button("Canto Deles", on_click=registrar_evento, args=("Canto", equipa_fora), use_container_width=True)
 
-# --- Processamento de Dados e Estatísticas ---
 with tab3:
     if len(st.session_state['eventos']) > 0:
-        # Criar DataFrame
         df = pd.DataFrame(st.session_state['eventos'])
-        
-        # Dashboard Rápido
         st.subheader("Resumo do Jogo")
-        
-        # Contagem de Eventos por Equipa
         stats = df.pivot_table(index='Evento', columns='Equipa', aggfunc='size', fill_value=0)
         st.dataframe(stats, use_container_width=True)
         
-        # Gráfico de Barras
-        st.bar_chart(df['Evento'].value_counts())
+        st.subheader("Cronologia")
+        st.dataframe(df[['Minuto', 'Equipa', 'Evento']].sort_values(by='Minuto', ascending=False), use_container_width=True, hide_index=True)
         
-        # Histórico Completo (Log)
-        st.subheader("Log de Eventos")
-        st.dataframe(df.sort_index(ascending=False), use_container_width=True) # Mostra o último evento primeiro
-        
-        # Botão de Download
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Baixar Relatório (CSV)",
-            data=csv,
-            file_name=f'scout_jogo_{datetime.now().strftime("%Y%m%d")}.csv',
-            mime='text/csv',
-        )
+        st.download_button("📥 Baixar CSV", data=csv, file_name='scout.csv', mime='text/csv')
     else:
-        st.info("Ainda não há eventos registados. O jogo vai começar!")
+        st.info("O jogo ainda não começou.")
