@@ -5,7 +5,7 @@ import time
 
 # --- Configuração da Página ---
 st.set_page_config(
-    page_title="ScoutMaster Pro",
+    page_title="Relatório de jogo PRO",
     page_icon="⚽",
     layout="wide"
 )
@@ -47,7 +47,7 @@ def registrar_evento(tipo_evento, equipa):
     st.toast(f"✅ {tipo_evento} registado ({equipa})!")
 
 # --- Interface Principal ---
-st.title("⚽ ScoutMaster: Painel de Jogo")
+st.title("⚽ Relatório de jogo: Painel de Jogo")
 
 # Sidebar para Configurações
 with st.sidebar:
